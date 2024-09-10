@@ -128,6 +128,14 @@ int main()
             lB = B;
         }
 
+        for (int i = 1; i < p_len - 1; ++i)
+        {
+            if (p[i].p.x < l_x) l_x = p[i].p.x;
+            if (p[i].p.x > h_x) h_x = p[i].p.x;
+            if (p[i].p.y > l_y) l_y = p[i].p.y;
+            if (p[i].p.y < h_y) h_y = p[i].p.y;
+        }
+
         EndMode2D();
 
         const int font_size = 20;
@@ -147,6 +155,10 @@ int main()
         char h_y_msg[10];
         sprintf(l_h_msg, "l_x: %.1f | h_x: %.1f | l_y: %.1f | h_y: %.1f", l_x, h_x, l_y, h_y);
         DrawText(l_h_msg, msg_startx, msg_starty * p_len, font_size, YELLOW);
+
+        char mouse_msg[50];
+        sprintf(mouse_msg, "mouse_x: %.1f, mouse_y: %.1f", mw_pos.x, mw_pos.y);
+        DrawText(mouse_msg, msg_startx, msg_starty * (p_len + 1), font_size, YELLOW);
 
         if (h_x - l_x != 0 && h_y - l_y != 0)
         {
