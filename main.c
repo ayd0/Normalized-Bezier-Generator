@@ -12,6 +12,8 @@ typedef struct
 
 Vector2 BezierCubic(Vector2* p, float t);
 
+#define MAX_INPUT_CHARS 20
+
 int main()
 {
     const int SCR_W = 1920;
@@ -19,8 +21,12 @@ int main()
     const float POINT_SIZE = 2.0f;
     bool POINT_SELECTED = false;
     bool IS_LERPING = false;
+    bool NORMALIZE_CTL = true;
+    bool WRAPPER_MSG_BOX_SELECTED = false;
     float LERP_TIME = 0.0f;
     float LERP_DURATION = 3.0f;
+
+    char wrapper_msg[MAX_INPUT_CHARS] = "{*}";
 
     InitWindow(SCR_W, SCR_H, "Bezier Normalizer");
 
@@ -48,14 +54,6 @@ int main()
 
     while (!WindowShouldClose())
     {
-        if (IsKeyPressed(KEY_R))
-        {
-            p[0] = (Bez_p){{scr_center.x - 100.0f, scr_center.y}, false, false};
-            p[1] = (Bez_p){{scr_center.x - 50.0f, scr_center.y + 50.0f}, false, false};
-            p[2] = (Bez_p){{scr_center.x + 50.0f, scr_center.y - 200.0f}, false, false};
-            p[3] = (Bez_p){{scr_center.x + 100.0f, scr_center.y,}, false, false};
-        }
-
         Vector2 mw_pos = GetScreenToWorld2D(GetMousePosition(), camera);
 
         for (int i = 0; i < p_len; ++i)
@@ -139,12 +137,15 @@ int main()
             lB = B;
         }
 
-        for (int i = 1; i < p_len - 1; ++i)
+        if (NORMALIZE_CTL)
         {
-            if (p[i].p.x < l_x) l_x = p[i].p.x;
-            if (p[i].p.x > h_x) h_x = p[i].p.x;
-            if (p[i].p.y > l_y) l_y = p[i].p.y;
-            if (p[i].p.y < h_y) h_y = p[i].p.y;
+            for (int i = 1; i < p_len - 1; ++i)
+            {
+                if (p[i].p.x < l_x) l_x = p[i].p.x;
+                if (p[i].p.x > h_x) h_x = p[i].p.x;
+                if (p[i].p.y > l_y) l_y = p[i].p.y;
+                if (p[i].p.y < h_y) h_y = p[i].p.y;
+            }
         }
 
         EndMode2D();
@@ -161,15 +162,64 @@ int main()
         }
 
         char l_h_msg[50];
-        char h_x_msg[10];
-        char l_y_msg[10];
-        char h_y_msg[10];
         sprintf(l_h_msg, "l_x: %.1f | h_x: %.1f | l_y: %.1f | h_y: %.1f", l_x, h_x, l_y, h_y);
         DrawText(l_h_msg, msg_startx, msg_starty * p_len, font_size, YELLOW);
 
         char mouse_msg[50];
         sprintf(mouse_msg, "mouse_x: %.1f, mouse_y: %.1f", mw_pos.x, mw_pos.y);
         DrawText(mouse_msg, msg_startx, msg_starty * (p_len + 1), font_size, YELLOW);
+
+        char normalize_ctl_msg[50];
+        sprintf(normalize_ctl_msg, "(N) Normalize mid control points? %s", NORMALIZE_CTL ? "TRUE" : "FALSE");
+        DrawText(normalize_ctl_msg, msg_startx, msg_starty * (p_len + 3), font_size, NORMALIZE_CTL ? GREEN : RED);
+
+        DrawText("Wrapper Text Around *", msg_startx, msg_starty * (p_len + 4) + 10, font_size * 0.75f, LIGHTGRAY);
+
+        int wrapper_msg_box_height = 35;
+        Rectangle wrapper_box_rec = {msg_startx, msg_starty * (p_len + 5), 300, wrapper_msg_box_height};
+        DrawRectangleRec(wrapper_box_rec, DARKGRAY);
+        DrawRectangleLines(wrapper_box_rec.x, wrapper_box_rec.y, wrapper_box_rec.width, 
+                           wrapper_box_rec.height, WRAPPER_MSG_BOX_SELECTED ? YELLOW : RAYWHITE);
+
+        int wrapper_msg_text_offset = (wrapper_msg_box_height - font_size) / 2;
+        Vector2 wrapper_msg_dims = MeasureTextEx(GetFontDefault(), wrapper_msg, font_size, 1.0);
+        DrawText(wrapper_msg, msg_startx + wrapper_msg_text_offset,
+                 msg_starty * (p_len + 5) + wrapper_msg_text_offset, font_size, RAYWHITE);
+
+        if (WRAPPER_MSG_BOX_SELECTED)
+        {
+            DrawRectangle(msg_startx + wrapper_msg_text_offset + wrapper_msg_dims.x + 5,
+                          msg_starty * (p_len + 5) + wrapper_msg_text_offset, font_size / 3, font_size - 1, RAYWHITE);
+
+            char key = GetCharPressed();
+            int wrapper_msg_len = strlen(wrapper_msg);
+            if ((key >= 32) && (key <= 125) && wrapper_msg_len < MAX_INPUT_CHARS)
+            {
+                wrapper_msg[wrapper_msg_len] = key;
+                wrapper_msg[wrapper_msg_len + 1] = '\0';
+            }
+            if (IsKeyPressed(KEY_BACKSPACE) && wrapper_msg_len > 0)
+            {
+                wrapper_msg[wrapper_msg_len - 1] = '\0';
+            }
+        }
+
+        bool lmb_down = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+        if (CheckCollisionPointRec(GetMousePosition(), wrapper_box_rec))
+        {
+            if(lmb_down)
+            {
+                WRAPPER_MSG_BOX_SELECTED = true;
+            }
+        }
+        else if (lmb_down)
+        {
+            WRAPPER_MSG_BOX_SELECTED = false;
+        }
+        if (WRAPPER_MSG_BOX_SELECTED && IsKeyPressed(KEY_ENTER))
+        {
+            WRAPPER_MSG_BOX_SELECTED = false;
+        }
 
         if (h_x - l_x != 0 && h_y - l_y != 0)
         {
@@ -181,10 +231,34 @@ int main()
             }
 
             char normalized_coord_str[600] = "{";
+            char msg_prefix[20] = "";
+            int pre = 0;
+            char msg_postfix[20] = "";
+            int post = 0;
+            bool is_pre = true;
+            
+            for (int i = 0; i < strlen(wrapper_msg); ++i)
+            {
+                if (wrapper_msg[i] == '*')
+                {
+                    is_pre = false;
+                    continue;
+                }
+                if (is_pre)
+                {
+                    msg_prefix[pre++] = wrapper_msg[i];
+                    msg_prefix[pre] = '\0';
+                }
+                else
+                {
+                    msg_postfix[post++] = wrapper_msg[i];
+                    msg_postfix[post] = '\0';
+                }
+            }
             for (int i = 0;i < p_len; ++i)
             {
                 char coord[50];
-                sprintf(coord, "{%.3f, %.3f}", fabsf(normal_coords[i].x), fabsf(normal_coords[i].y));
+                sprintf(coord, "%s%.3f, %.3f%s", msg_prefix, fabsf(normal_coords[i].x), fabsf(normal_coords[i].y), msg_postfix);
                 strcat(normalized_coord_str, coord);
                 if (i < p_len - 1)
                     strcat(normalized_coord_str, ", ");
@@ -195,14 +269,28 @@ int main()
             float wsl_y = GetWorldToScreen2D((Vector2){0.0f, l_y}, camera).y;
             DrawText(normalized_coord_str, SCR_W / 2.0f - msg_dims.x / 2.0f, wsl_y + 20, font_size, YELLOW);
 
-            if (IsKeyPressed(KEY_T))
+            if (!WRAPPER_MSG_BOX_SELECTED)
             {
-                IS_LERPING = true;
-                LERP_TIME = 0.0f;
-            }
-            if (IsKeyPressed(KEY_C))
-            {
-                SetClipboardText(normalized_coord_str);
+                if (IsKeyPressed(KEY_R))
+                {
+                    p[0] = (Bez_p){{scr_center.x - 100.0f, scr_center.y}, false, false};
+                    p[1] = (Bez_p){{scr_center.x - 50.0f, scr_center.y + 50.0f}, false, false};
+                    p[2] = (Bez_p){{scr_center.x + 50.0f, scr_center.y - 200.0f}, false, false};
+                    p[3] = (Bez_p){{scr_center.x + 100.0f, scr_center.y,}, false, false};
+                }
+                if (IsKeyPressed(KEY_T))
+                {
+                    IS_LERPING = true;
+                    LERP_TIME = 0.0f;
+                }
+                if (IsKeyPressed(KEY_N))
+                {
+                    NORMALIZE_CTL = !NORMALIZE_CTL;
+                }
+                if (IsKeyPressed(KEY_C))
+                {
+                    SetClipboardText(normalized_coord_str);
+                }
             }
 
             if (IS_LERPING)
