@@ -10,12 +10,17 @@ typedef struct
     bool selected;
 } Bez_p;
 
+Vector2 BezierCubic(Vector2* p, float t);
+
 int main()
 {
     const int SCR_W = 1920;
     const int SCR_H = 1080;
     const float POINT_SIZE = 2.0f;
     bool POINT_SELECTED = false;
+    bool IS_LERPING = false;
+    float LERP_TIME = 0.0f;
+    float LERP_DURATION = 2.0f;
 
     InitWindow(SCR_W, SCR_H, "Bezier Normalizer");
 
@@ -183,6 +188,30 @@ int main()
 
             float wsl_y = GetWorldToScreen2D((Vector2){0.0f, l_y}, camera).y;
             DrawText(normalized_coord_str, SCR_W / 2.0f - msg_dims.x / 2.0f, wsl_y + 20, font_size, YELLOW);
+
+            if (IsKeyPressed(KEY_T))
+            {
+                IS_LERPING = true;
+                LERP_TIME = 0.0f;
+            }
+
+            if (IS_LERPING)
+            {
+                LERP_TIME += GetFrameTime();
+
+                float t = fmin(LERP_TIME / LERP_DURATION, 1.0f);
+                Vector2 bez = BezierCubic(normal_coords, t);
+
+                Color lerp_col = {0, 255 * bez.y, 0, 255};
+                DrawText("Lerp Test", SCR_W / 2.0f, 15.0f, font_size, lerp_col);
+                DrawRectangle(SCR_W - 400, 10, 390, SCR_H - 20, lerp_col);
+
+                if (t == 1.0f)
+                {
+                    IS_LERPING = false;
+                    LERP_TIME = 0.0f;
+                }
+            }
         }
         else
         {
@@ -196,4 +225,18 @@ int main()
 
     CloseWindow();
     return 0;
+}
+
+Vector2 BezierCubic(Vector2* p, float t)
+{
+    float u = 1.0f - t;
+    float tt = t * t;
+    float uu = u * u;
+    float uuu = uu * u;
+    float ttt = tt * t;
+
+    float x = uuu * p[0].x + 3 * uu * t * p[1].x + 3 * u * tt * p[2].x + ttt * p[3].x;
+    float y = uuu * p[0].y + 3 * uu * t * p[1].y + 3 * u * tt * p[2].y + ttt * p[3].y;
+
+    return (Vector2){x, y};
 }
