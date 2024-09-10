@@ -20,7 +20,7 @@ int main()
     bool POINT_SELECTED = false;
     bool IS_LERPING = false;
     float LERP_TIME = 0.0f;
-    float LERP_DURATION = 2.0f;
+    float LERP_DURATION = 3.0f;
 
     InitWindow(SCR_W, SCR_H, "Bezier Normalizer");
 
@@ -48,6 +48,14 @@ int main()
 
     while (!WindowShouldClose())
     {
+        if (IsKeyPressed(KEY_R))
+        {
+            p[0] = (Bez_p){{scr_center.x - 100.0f, scr_center.y}, false, false};
+            p[1] = (Bez_p){{scr_center.x - 50.0f, scr_center.y + 50.0f}, false, false};
+            p[2] = (Bez_p){{scr_center.x + 50.0f, scr_center.y - 200.0f}, false, false};
+            p[3] = (Bez_p){{scr_center.x + 100.0f, scr_center.y,}, false, false};
+        }
+
         Vector2 mw_pos = GetScreenToWorld2D(GetMousePosition(), camera);
 
         for (int i = 0; i < p_len; ++i)
@@ -109,26 +117,24 @@ int main()
         float l_y = p[0].p.y;
         float h_y = p[0].p.y;
 
+        Vector2 p_v[p_len];
+        for (int i = 0; i < p_len; ++i)
+        {
+            p_v[i] = p[i].p;
+        }
+
         Vector2 lB = p[0].p;
         for (int i = 0; i < steps + 1; ++i)
         {
             float t = (float)i / steps;
 
-            float u = 1 - t;
-            float tt = t * t;
-            float uu = u * u;
-            float uuu = uu * u;
-            float ttt = tt * t;
+            Vector2 B = BezierCubic(p_v, t);
 
-            float x = uuu * p[0].p.x + 3 * uu * t * p[1].p.x + 3 * u * tt * p[2].p.x + ttt * p[3].p.x;
-            float y = uuu * p[0].p.y + 3 * uu * t * p[1].p.y + 3 * u * tt * p[2].p.y + ttt * p[3].p.y;
+            if (B.x < l_x) l_x = B.x;
+            if (B.x > h_x) h_x = B.x;
+            if (B.y > l_y) l_y = B.y;
+            if (B.y < h_y) h_y = B.y;
 
-            if (x < l_x) l_x = x;
-            if (x > h_x) h_x = x;
-            if (y > l_y) l_y = y;
-            if (y < h_y) h_y = y;
-
-            Vector2 B = {x, y};
             DrawLineEx(lB, B, 2.0f, MAROON);
             lB = B;
         }
@@ -194,6 +200,10 @@ int main()
                 IS_LERPING = true;
                 LERP_TIME = 0.0f;
             }
+            if (IsKeyPressed(KEY_C))
+            {
+                SetClipboardText(normalized_coord_str);
+            }
 
             if (IS_LERPING)
             {
@@ -202,9 +212,11 @@ int main()
                 float t = fmin(LERP_TIME / LERP_DURATION, 1.0f);
                 Vector2 bez = BezierCubic(normal_coords, t);
 
-                Color lerp_col = {0, 255 * bez.y, 0, 255};
+                Color lerp_col = DARKBLUE;
                 DrawText("Lerp Test", SCR_W / 2.0f, 15.0f, font_size, lerp_col);
-                DrawRectangle(SCR_W - 400, 10, 390, SCR_H - 20, lerp_col);
+                int starty = 10 + ((SCR_H - 10) * (1 - bez.y));
+                DrawRectangle(SCR_W - 90, starty, 80, SCR_H - starty - 40, lerp_col);
+                DrawCircle(SCR_W - 130, 40, 30.0f * bez.y, lerp_col);
 
                 if (t == 1.0f)
                 {
@@ -232,11 +244,9 @@ Vector2 BezierCubic(Vector2* p, float t)
     float u = 1.0f - t;
     float tt = t * t;
     float uu = u * u;
-    float uuu = uu * u;
-    float ttt = tt * t;
 
-    float x = uuu * p[0].x + 3 * uu * t * p[1].x + 3 * u * tt * p[2].x + ttt * p[3].x;
-    float y = uuu * p[0].y + 3 * uu * t * p[1].y + 3 * u * tt * p[2].y + ttt * p[3].y;
+    float x = u * uu * p[0].x + 3 * uu * t * p[1].x + 3 * u * tt * p[2].x + t * tt * p[3].x;
+    float y = u * uu * p[0].y + 3 * uu * t * p[1].y + 3 * u * tt * p[2].y + t * tt * p[3].y;
 
     return (Vector2){x, y};
 }
